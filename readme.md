@@ -1,4 +1,6 @@
-# Packages installés (je crois...)
+# Packages installés 
+
+> J'espère ne pas en avoir oublié! ;)
 
 ```bash
 sudo apt-get install libbluetooth-dev
