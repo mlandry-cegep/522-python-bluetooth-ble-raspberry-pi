@@ -1,46 +1,58 @@
 import logging
-
-# Modules Bluezero pour la gestion Bluetooth Low Energy (BLE)
+import random
 from bluezero import adapter
 from bluezero import peripheral
 
-# UUID du service principal
+# SERVICE UUID
+# TODO : Modifier ces GUID pour mettre les vôtres. Vous devez avoir les mêmes dans le code python ET dans votre app mobile
 BOT_SERVICE_PRINCIPAL = '15ff0fcd-6481-4565-9fe0-388628769cce'
-# UUID de la caractéristique des commandes
 BOT_CARACTERISTIQUE_COMMANDES = '34a28b10-1486-4c61-9fa1-878296fd0262'
 
-def write_value(value, options):
-    # Fonction de callback appelée lors de la réception d'une commande d'écriture
-    print(f"Demande d'écriture reçue: {value}")	
-    # Conversion des données reçues en chaîne de caractères UTF-8
-    cmd_str = value.decode("utf-8")
 
-    print(f"Commande reçue: {cmd_str}")
+class BLEService:
+    def __init__(self):
+        # Get the default adapter address
+        self.adapter_address = list(adapter.Adapter.available())[0].address
+        
+        # Création du périphérique BLE
+        self.logger = logging.getLogger('localGATT')
+        self.logger.setLevel(logging.DEBUG)
 
-def main(adapter_address):
-    # Initialisation du périphérique BLE
-    logger = logging.getLogger('localGATT')
-    logger.setLevel(logging.DEBUG)
+        print('Initialisation du périphérique BLE')
+        # Create peripheral
+        self.bot_monitor = peripheral.Peripheral(self.adapter_address,
+                                            local_name='mlandry PI - bot',
+                                            appearance=1344)
+        
+        # Add service
+        self.bot_monitor.add_service(srv_id=1, uuid=BOT_SERVICE_PRINCIPAL, primary=True)
+        
+        # Add characteristic
+        self.bot_monitor.add_characteristic(srv_id=1, chr_id=1, uuid=BOT_CARACTERISTIQUE_COMMANDES,
+                                       value=[], notifying=False,
+                                       flags=['write', 'write-without-response', 'read'],
+                                       read_callback=self.read_value,
+                                       write_callback=self.write_value,
+                                       notify_callback=None
+                                       )
 
-    print('Initialisation du périphérique BLE')
-    # Création du périphérique BLE avec le nom local et l'apparence spécifiés
-    bot_monitor = peripheral.Peripheral(adapter_address,
-                                        local_name='mlandry PI - bot', # TODO: Modifier le nom du périphérique
-                                        appearance=1344)
-    # Ajout du service principal
-    bot_monitor.add_service(srv_id=1, uuid=BOT_SERVICE_PRINCIPAL, primary=True)
-    # Ajout de la caractéristique des commandes avec les callbacks appropriés
-    bot_monitor.add_characteristic(srv_id=1, chr_id=1, uuid=BOT_CARACTERISTIQUE_COMMANDES,
-                                   value=[], notifying=False,
-                                   flags=['write', 'write-without-response'],
-                                   read_callback=None,
-                                   write_callback=write_value,
-                                   notify_callback=None
-                                   )
+    def write_value(self, value, options):
+        print(f"Write request received: {value}")	
+        # Note use of control_point, to assign one or more values into variables
+        # from struct.unpack output which returns a tuple
+        try:
+            cmd_str = value.decode("utf-8")
+            print(f"Commande reçue: {cmd_str}")
+        except Exception as e:
+            print(f"Erreur de décodage: {e}")
 
-    # Publication du périphérique BLE
-    bot_monitor.publish()
+        
+    def read_value(self): 
+        print(f"Read request received")
+        # TODO: retourner les infos demandées.
+        cpu_value = random.randrange(3200, 5310, 10) / 100
+        return list(int(cpu_value * 100).to_bytes(2, byteorder='little', signed=True))
 
-if __name__ == '__main__':
-    # Démarrage du périphérique BLE
-    main(list(adapter.Adapter.available())[0].address)
+
+    def start(self):
+        self.bot_monitor.publish()
